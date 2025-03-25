@@ -1,11 +1,12 @@
 import express from "express";
-import { addPlaylist, deletePlaylist, getDevice, login } from "../controllers/device_controller.js";
+import { addPlaylist, deletePlaylist, editPlaylist, getDevice, login } from "../controllers/device_controller.js";
 
 const deviceRouter = express.Router();
 
 deviceRouter.post("/login", login);
-deviceRouter.get("/getUser", getDevice);
-deviceRouter.post("/addPlayist", addPlaylist);
-deviceRouter.post("/playlistDelete", deletePlaylist);
+deviceRouter.get("/getDevice", getDevice);
+deviceRouter.post("/addPlaylist", addPlaylist);
+deviceRouter.post("/deletePlaylist", deletePlaylist);
+deviceRouter.post("/editPlaylist", editPlaylist);
 
 export default deviceRouter;

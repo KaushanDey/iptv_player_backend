@@ -17,7 +17,10 @@ export const login = async (req, res, next) => {
                 playlists: []
             });
 
-            await newDevice.save();
+            const session = await mongoose.startSession();
+            session.startTransaction();
+            await newDevice.save({session});
+            session.commitTransaction();
 
             device = newDevice;
         } else {
@@ -57,21 +60,30 @@ export const getDevice = async (req, res, next) => {
 export const addPlaylist = async (req, res, next) => {
 
     const { macAddress, deviceKey, name, host, username, password } = req.body;
-    const hashedPassword = bcrypt.hashSync(password);
+    //const hashedPassword = bcrypt.hashSync(password);
     let device;
 
     try {
-        device = await Device.findOne({ macAddress: macAddress, deviceKey: deviceKey });
+        device = await Device.findOne({ macAddress: macAddress});
 
-        if (!device) return res.stautus(400).json({ message: "Something went wrong!!" });
+        if (!device){
+            return res.stautus(400).json({ message: "The device was not found!!" });
+            // device = new Device();
+            // device.macAddress = macAddress;
+            // const hashedDeviceKey = bcrypt.hashSync(deviceKey);
+            // device.deviceKey = hashedDeviceKey;
+        }else{
+            const isDeviceKeyValid = await bcrypt.compareSync(deviceKey, device.deviceKey);
+            if(!isDeviceKeyValid) return res.status(400).json({ message: "The device key is incorrect!!" });
+        }
 
         const session = await mongoose.startSession();
         session.startTransaction();
         device.playlists.push({
-            name,
-            host,
-            username,
-            hashedPassword
+            playlistName: name,
+            playlistHost: host,
+            playlistUsername: username,
+            playlistPassword: password
         });
 
         await device.save({session});
@@ -83,18 +95,19 @@ export const addPlaylist = async (req, res, next) => {
     }
 };
 
-
-
 export const deletePlaylist = async (req, res, next) => {
 
     const { macAddress, deviceKey, name, host, username, password } = req.body;
-    const hashedPassword = bcrypt.hashSync(password);
     let device;
-
     try {
-        device = await Device.findOne({ macAddress: macAddress, deviceKey: deviceKey });
+        device = await Device.findOne({ macAddress: macAddress});
 
-        if (!device) return res.stautus(400).json({ message: "Something went wrong!!" });
+        if (!device){
+            return res.status(400).json({ message: "Something went wrong!!" });
+        }else{
+            const isDeviceKeyCorrect = await bcrypt.compareSync(deviceKey, device.deviceKey);
+            if(!isDeviceKeyCorrect) return res.status(400).json({message: "Device Key is incorrect!!"});
+        }
 
         const session = await mongoose.startSession();
         session.startTransaction();
@@ -102,7 +115,7 @@ export const deletePlaylist = async (req, res, next) => {
         let arr = device.playlists;
         let idx = -1;
         for(let i=0;i<arr.length;i++){
-            if(arr[i].name==name && arr[i].host==host && arr[i].username==username && arr[i].password==password){
+            if(arr[i].playlistName==name && arr[i].playlistHost==host && arr[i].playlistUsername==username && arr[i].playlistPassword==password){
                 idx = i;
                 break;
             }
@@ -120,3 +133,39 @@ export const deletePlaylist = async (req, res, next) => {
     }
 };
 
+export const editPlaylist = async (req, res, next) => {
+
+    const {macAddress, deviceKey, prevName, name, host, username, password} = req.body;
+    let device;
+    try {
+        device = await Device.findOne({ macAddress: macAddress});
+
+        if (!device){
+            return res.status(400).json({ message: "Something went wrong!!" });
+        }else{
+            const isDeviceKeyCorrect = await bcrypt.compareSync(deviceKey, device.deviceKey);
+            if(!isDeviceKeyCorrect) return res.status(400).json({message: "Device Key is incorrect!!"});
+        }
+
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        
+        let arr = device.playlists;
+        for(let i=0;i<arr.length;i++){
+            if(arr[i].playlistName==prevName){
+                arr[i].playlistName = name;
+                arr[i].playlistHost = host;
+                arr[i].playlistUsername = username;
+                arr[i].playlistPassword = password;
+                break;
+            }
+        }
+        device.playlists = arr;
+        await device.save({session});
+        session.commitTransaction();
+
+        return res.status(200).json({message: "Playlist edited successfully!!"});
+    }catch(err){
+        return res.status(400).json({message: err});
+    }
+}
